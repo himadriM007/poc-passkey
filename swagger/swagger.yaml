@@ -1,0 +1,18 @@
+# swagger/swagger.yaml
+openapi: 3.0.0
+info:
+  title: Database Service API
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /database/check-connection:
+    get:
+      summary: Check database connection
+      description: |
+        Endpoint to check the connection to the PostgreSQL database.
+      responses:
+        '200':
+          description: Database connection successful
+        '500':
+          description: Database connection error
