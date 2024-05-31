@@ -1,3 +1,8 @@
-import { generateToken, checkUser, getProfile } from './userService';
+import {
+  generateToken,
+  getAuthorizeUser,
+  postAuthorizeUser,
+  getUserInfo,
+} from './userService';
 
-export { generateToken, checkUser, getProfile };
+export { generateToken, getAuthorizeUser, postAuthorizeUser, getUserInfo };

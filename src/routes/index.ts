@@ -1,11 +1,19 @@
 import { Router } from 'express';
-import { checkUser, generateToken, getProfile } from '../services';
+import {
+  getAuthorizeUser,
+  postAuthorizeUser,
+  generateToken,
+  getUserInfo,
+} from '../services';
 
 const router = Router();
 
 // Users
-router.route('/oauth/authorize').get(checkUser);
-router.route('/get-profile').get(getProfile);
-router.route('/oauth/token').post(generateToken);
+router.route('/authorize').get(getAuthorizeUser);
+router.route('/authorize').post(postAuthorizeUser);
+
+router.route('/userinfo').get(getUserInfo);
+
+router.route('/token').post(generateToken);
 
 export default router;
