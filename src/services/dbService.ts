@@ -7,7 +7,7 @@ const pool = new Pool({
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
   port: 5432,
-  ssl: true
+  ssl: true,
 });
 
 export const checkDatabaseConnection = async (): Promise<void> => {
@@ -24,7 +24,7 @@ export const checkDatabaseConnection = async (): Promise<void> => {
 export const callDatabaseFunction = async (
   functionName: string,
   params: any[] = []
-): Promise<any[]> => {
+): Promise<any[] | boolean> => {
   try {
     const client = await pool.connect();
     const result: QueryResult = await client.query(
@@ -32,7 +32,13 @@ export const callDatabaseFunction = async (
       params
     );
     client.release();
-    return result.rows;
+
+    const response = result.rows[0][`${functionName}`];
+
+    if (response.msg_id === 1) {
+      return response.data === undefined ? true : response.data;
+    }
+    return [];
   } catch (error: any) {
     throw new Error(
       `Error calling database function ${functionName}: ${error.message}`

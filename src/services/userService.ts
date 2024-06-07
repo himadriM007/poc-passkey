@@ -16,7 +16,7 @@ export const generateToken = async (req: Request, res: Response) => {
   try {
     const { client_id, client_secret, code } = req.body;
 
-    const token = oAuthModal.generateAccessToken(
+    const token = await oAuthModal.generateAccessToken(
       client_id,
       client_secret,
       code
@@ -48,7 +48,7 @@ export const getAuthorizeUser = async (req: Request, res: Response) => {
         scope,
       } = query;
 
-    if (oAuthModal.checkClient(client_id)) {
+    if (await oAuthModal.checkClient(client_id)) {
       res.send(`
         <div>
           <form method="post" action="/oauth/authorize">
@@ -88,20 +88,26 @@ export const postAuthorizeUser = async (req: Request, res: Response) => {
         state,
         scope,
       } = req.body,
-      selectedUser = oAuthModal.getUser(email, password);
+      selectedUser = await oAuthModal.getUser(email, password);
 
     if (!selectedUser) {
       return res.status(401).send('Invalid email or password');
     }
 
-    const authorizationCode = crypto.randomBytes(20).toString('hex');
-    oAuthModal.saveAuthorizationCode(
-      authorizationCode,
-      client_id,
-      redirect_uri,
-      selectedUser,
-      scope
-    );
+    const authorizationCode = crypto.randomBytes(20).toString('hex'),
+      ifAuthSaved = await oAuthModal.saveAuthorizationCode(
+        authorizationCode,
+        client_id,
+        redirect_uri,
+        selectedUser,
+        scope
+      );
+
+    if (!ifAuthSaved) {
+      res.send(`
+        <h1>Something went wrong!!</h1>
+      `);
+    }
 
     const redirectUrl = `${redirect_uri}?code=${authorizationCode}&state=${state}`;
     res.redirect(redirectUrl);
@@ -121,6 +127,8 @@ export const getUserInfo = async (req: Request, res: Response) => {
       return res.status(401).send('Invalid authorization');
     }
     const decodedToken: any = oAuthModal.getUserFullInfo(authorization);
+
+    console.log(decodedToken);
 
     if (decodedToken) {
       const { id, name, email } = decodedToken.user;

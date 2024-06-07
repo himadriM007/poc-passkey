@@ -1,37 +1,8 @@
 import jwt from 'jsonwebtoken';
-import {
-  AuthorizationCode,
-  Client,
-  Falsey,
-  Token,
-  User,
-} from 'oauth2-server';
+import { AuthorizationCode, Client, Falsey, Token, User } from 'oauth2-server';
+import { callDatabaseFunction } from '../services/dbService';
 
-const clients: Client[] = [
-    {
-      id: 'client1',
-      clientSecret: 'secret1',
-      redirectUris: ['http://localhost:3000/callback'],
-      grants: ['password', 'refresh_token', 'authorization_code'],
-    },
-  ],
-  users: User[] = [
-    {
-      id: '1',
-      email: 'himadri.mallick@digitalavenues.com',
-      name: 'Himadri Mallick',
-      picture: 'https://example.com/johndoe.jpg',
-      password: 'Password@123',
-    },
-    {
-      id: '2',
-      email: 'amit@example.com',
-      name: 'John Doe',
-      picture: 'https://example.com/johndoe.jpg',
-      password: 'password',
-    },
-  ],
-  tokens: Token[] = [],
+const tokens: Token[] = [],
   authorizationCodes: AuthorizationCode[] = [],
   secretKey = process.env.SECRET_KEY ?? 'Password@123';
 
@@ -40,23 +11,25 @@ const getAccessToken = (token: string): Token | null => {
   return accessToken ? accessToken : null;
 };
 
-const generateAccessToken = (
+const generateAccessToken = async (
   client_id: string,
   client_secret: string,
   code: string
-): string | Falsey => {
-  const userInfo = authorizationCodes.find(
-    (el) => el.authorizationCode === code
-  );
+): Promise<string | Falsey> => {
+  const authCodeArr: any = await callDatabaseFunction(
+      'fn_get_authorization_code',
+      [{ code }]
+    ),
+    authCode = authCodeArr[0];
 
-  if (!userInfo) {
+  if (!authCode) {
     return null;
   }
 
-  const accessTokenLifetime = userInfo?.client?.accessTokenLifetime
-      ? userInfo?.client?.accessTokenLifetime / 3600
+  const accessTokenLifetime = authCode?.client?.accessTokenLifetime
+      ? authCode?.client?.accessTokenLifetime / 3600
       : 1,
-    token = jwt.sign(userInfo, secretKey, {
+    token = jwt.sign(authCode, secretKey, {
       expiresIn: accessTokenLifetime + 'h',
     });
 
@@ -77,52 +50,70 @@ const saveToken = (token: Token, client: Client, user: User): Token => {
   return token;
 };
 
-const getClient = (clientId: string, clientSecret: string): Client | null => {
-  const client = clients.find(
-    (c) => c.id === clientId && c.clientSecret === clientSecret
+const getClient = async (
+  clientId: string,
+  clientSecret: string
+): Promise<Client | null> => {
+  const client: any = await callDatabaseFunction('fn_get_client', [
+    { client_id: clientId, client_secret: clientSecret },
+  ]);
+
+  return client?.length ? client : null;
+};
+
+const checkClient = async (clientId: string): Promise<boolean> => {
+  const client: any = await callDatabaseFunction('fn_get_client', [
+    { client_id: clientId },
+  ]);
+
+  return client.length > 0;
+};
+
+const getUser = async (
+  email: string,
+  password: string
+): Promise<User | null> => {
+  const user: any = await callDatabaseFunction('fn_get_user', [
+    { email, password },
+  ]);
+
+  return user?.length ? user[0] : null;
+};
+
+const getAuthorizationCode = async (
+  code: string
+): Promise<AuthorizationCode | null> => {
+  const authCode: any = await callDatabaseFunction(
+    'fn_get_authorization_code',
+    [{ code }]
   );
-  return client ? client : null;
-};
 
-const checkClient = (clientId: string): boolean => {
-  return Boolean(clients.find((el) => el.id === clientId));
-};
-
-const getUser = (username: string, password: string): User | null => {
-  const user = users.find(
-    (u) => u.email === username && u.password === password
-  );
-  return user ? user : null;
-};
-
-const getAuthorizationCode = (code: string): AuthorizationCode | null => {
-  const authCode = authorizationCodes.find((c) => c.authorizationCode === code);
   return authCode ? authCode : null;
 };
 
-const saveAuthorizationCode = (
+const saveAuthorizationCode = async (
   code: string,
   clientId: string,
   redirectUri: string,
   user: User,
   scope?: string
-): void => {
-  const client: Client = {
-    id: clientId,
-    redirectUris: [redirectUri],
-    grants: 'authorization_code',
-    accessTokenLifetime: 3600,
-    refreshTokenLifetime: 1209600,
-  };
+): Promise<boolean> => {
+  const response: any = await callDatabaseFunction(
+    'fn_save_authorization_code',
+    [
+      {
+        authorization_code: code,
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        grants: 'authorization_code',
+        user_id: user.id,
+        scope,
+        expires_at: new Date(Date.now() + 3600 * 1000),
+      },
+    ]
+  );
 
-  authorizationCodes.push({
-    authorizationCode: code,
-    expiresAt: new Date(Date.now() + 3600 * 1000),
-    client,
-    redirectUri,
-    scope,
-    user,
-  });
+  return response;
 };
 
 const revokeAuthorizationCode = (code: AuthorizationCode): boolean => {
